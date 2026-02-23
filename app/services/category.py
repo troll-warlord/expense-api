@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from structlog.contextvars import bind_contextvars
 
 from app.models.category import Category
 from app.models.user import User
@@ -27,6 +28,7 @@ class CategoryService:
             updated_by=user.id,
         )
         created = await self._repo.create(category)
+        bind_contextvars(category_id=str(created.id))
         return CategoryRead.model_validate(created)
 
     async def update_category(self, category_id: UUID, payload: CategoryUpdate, user: User) -> CategoryRead:
@@ -36,6 +38,7 @@ class CategoryService:
         update_data = payload.model_dump(exclude_unset=True)
         update_data["updated_by"] = user.id
         updated = await self._repo.update(category, update_data)
+        bind_contextvars(category_id=str(category_id))
         return CategoryRead.model_validate(updated)
 
     async def delete_category(self, category_id: UUID, user: User) -> None:
@@ -43,6 +46,7 @@ class CategoryService:
         self._ensure_exists_and_owned(category, user.id)
         try:
             await self._repo.delete(category)
+            bind_contextvars(category_id=str(category_id))
         except IntegrityError:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

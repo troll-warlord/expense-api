@@ -25,10 +25,10 @@ class UserService:
         if data.email is not None:
             updates["email"] = data.email
         updated = await self._repo.update(user, updates)
-        log.info("profile_updated", user_id=str(user.id))
+        log.info("Profile updated", user_id=str(user.id))
         return UserRead.model_validate(updated)
 
     async def deactivate(self, user: User) -> UserRead:
         updated = await self._repo.update(user, {"is_active": False})
-        log.warning("account_deactivated", user_id=str(user.id))
+        log.warning("Account deactivated", user_id=str(user.id))
         return UserRead.model_validate(updated)

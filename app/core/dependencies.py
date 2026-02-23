@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,7 @@ DBSession = Annotated[AsyncSession, Depends(get_async_session)]
 
 
 async def get_current_user(
+    request: Request,
     db: DBSession,
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
 ):
@@ -48,6 +49,9 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Inactive user",
         )
+    # Write the validated user_id into request.state so the logging middleware
+    # can read it AFTER call_next completes (correct timing, avoids early-decode bug).
+    request.state.user_id = str(user.id)
     return user
 
 

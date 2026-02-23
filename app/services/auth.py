@@ -29,7 +29,7 @@ class AuthService:
     async def request_otp(self, country_code: str, phone_number: str) -> RequestOTPResponse:
         """Generate and 'send' (print) an OTP for the given phone number."""
         generate_otp()  # mock — prints OTP to stdout; real impl would send SMS
-        log.info("otp_requested", country_code=country_code, phone_number=phone_number)
+        log.info("OTP requested", country_code=country_code, phone_number=phone_number)
         return RequestOTPResponse(
             country_code=country_code,
             phone_number=phone_number,
@@ -55,15 +55,15 @@ class AuthService:
                 is_profile_complete=False,
             )
             await self._user_repo.create(user)
-            log.info("user_registered", country_code=payload.country_code, phone_number=payload.phone_number)
+            log.info("New user registered", country_code=payload.country_code, phone_number=payload.phone_number)
         elif not user.is_active:
-            log.warning("login_attempt_deactivated_account", user_id=str(user.id))
+            log.warning("Login blocked — account is deactivated", user_id=str(user.id))
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account is deactivated",
             )
         else:
-            log.info("user_login", user_id=str(user.id))
+            log.info("User logged in", user_id=str(user.id))
 
         return await self._issue_tokens(user, device_hint=payload.device_hint, is_new_user=is_new_user)
 
@@ -86,20 +86,20 @@ class AuthService:
 
         # Rotate: revoke old token and issue a new pair
         await self._token_repo.revoke(db_token)
-        log.info("token_refreshed", user_id=str(user.id))
+        log.info("Access token refreshed", user_id=str(user.id))
         return await self._issue_tokens(user, device_hint=db_token.device_hint)
 
     async def logout(self, raw_token: str) -> None:
         """Revoke a specific refresh token (logout from one device)."""
         db_token = await self._token_repo.get_by_token(raw_token)
         if db_token:
-            log.info("user_logout", user_id=str(db_token.user_id))
+            log.info("User logged out", user_id=str(db_token.user_id))
             await self._token_repo.delete(db_token)
 
     async def logout_all(self, user_id: UUID) -> None:
         """Revoke all refresh tokens for a user (logout from every device)."""
         await self._token_repo.revoke_all_for_user(user_id)
-        log.info("user_logout_all_devices", user_id=str(user_id))
+        log.info("User logged out from all devices", user_id=str(user_id))
 
     # ------------------------------------------------------------------
     # Private helpers

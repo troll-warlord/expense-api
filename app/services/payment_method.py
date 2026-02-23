@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from structlog.contextvars import bind_contextvars
 
 from app.models.payment_method import PaymentMethod
 from app.models.user import User
@@ -30,6 +31,7 @@ class PaymentMethodService:
             updated_by=user.id,
         )
         created = await self._repo.create(method)
+        bind_contextvars(payment_method_id=str(created.id))
         return PaymentMethodRead.model_validate(created)
 
     async def update_payment_method(self, method_id: UUID, payload: PaymentMethodUpdate, user: User) -> PaymentMethodRead:
@@ -39,6 +41,7 @@ class PaymentMethodService:
         update_data = payload.model_dump(exclude_unset=True)
         update_data["updated_by"] = user.id
         updated = await self._repo.update(method, update_data)
+        bind_contextvars(payment_method_id=str(method_id))
         return PaymentMethodRead.model_validate(updated)
 
     async def delete_payment_method(self, method_id: UUID, user: User) -> None:
@@ -46,6 +49,7 @@ class PaymentMethodService:
         self._ensure_exists_and_owned(method, user.id)
         try:
             await self._repo.delete(method)
+            bind_contextvars(payment_method_id=str(method_id))
         except IntegrityError:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

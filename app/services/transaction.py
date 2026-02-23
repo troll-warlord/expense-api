@@ -6,6 +6,7 @@ from uuid import UUID
 import structlog
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from structlog.contextvars import bind_contextvars
 
 from app.models.transaction import Transaction
 from app.models.user import User
@@ -84,12 +85,12 @@ class TransactionService:
             category_id=payload.category_id,
             payment_method_id=payload.payment_method_id,
             description=payload.description,
-            source=payload.source,
             created_by=user.id,
             updated_by=user.id,
         )
         created = await self._repo.create(transaction)
-        log.info("transaction_created", transaction_id=str(created.id), amount=str(payload.amount), date=str(payload.date))
+        # Bind to request context — appears in the single consolidated access line.
+        bind_contextvars(transaction_id=str(created.id))
         return TransactionRead.model_validate(created)
 
     async def update_transaction(self, transaction_id: UUID, payload: TransactionUpdate, user: User) -> TransactionRead:
@@ -111,10 +112,9 @@ class TransactionService:
 
         update_data["updated_by"] = user.id
         updated = await self._repo.update(tx, update_data)
-        log.info(
-            "transaction_updated",
+        bind_contextvars(
             transaction_id=str(transaction_id),
-            fields=list(payload.model_dump(exclude_unset=True).keys()),
+            updated_fields=list(update_data.keys()),
         )
         return TransactionRead.model_validate(updated)
 
@@ -126,7 +126,7 @@ class TransactionService:
                 detail="Transaction not found",
             )
         await self._repo.delete(tx)
-        log.info("transaction_deleted", transaction_id=str(transaction_id))
+        bind_contextvars(transaction_id=str(transaction_id))
 
     # ------------------------------------------------------------------
     async def get_summary(

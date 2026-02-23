@@ -91,13 +91,16 @@ def create_app() -> FastAPI:
 
         response.headers["X-Request-ID"] = request_id
 
-        access_log.info(
-            "http_request",
-            method=request.method,
-            path=request.url.path,
-            status=response.status_code,
-            duration_ms=duration_ms,
-        )
+        status_code = response.status_code
+        msg = f"{request.method} {request.url.path} → {status_code} ({duration_ms}ms)"
+        extra = {"query": request.url.query} if request.url.query else {}
+        if status_code >= 500:
+            access_log.error(msg, **extra)
+        elif status_code >= 400:
+            access_log.warning(msg, **extra)
+        else:
+            access_log.info(msg, **extra)
+
         return response
 
     # ------------------------------------------------------------------
@@ -141,6 +144,8 @@ def create_app() -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         errors = [f"{' → '.join(str(loc) for loc in e['loc'] if loc != 'body')}: {e['msg']}" for e in exc.errors()]
+        # Bind to context — appears in the consolidated access line emitted by middleware
+        structlog.contextvars.bind_contextvars(validation_errors=errors)
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
@@ -152,7 +157,10 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        log.exception("unhandled error", exc_info=exc)
+        # Emit a dedicated ERROR line that includes the full traceback
+        log.exception("Unhandled exception", exc_info=exc)
+        # Bind error type so it also appears in the consolidated access line
+        structlog.contextvars.bind_contextvars(error=type(exc).__name__)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
