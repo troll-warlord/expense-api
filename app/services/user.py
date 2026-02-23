@@ -16,15 +16,15 @@ class UserService:
         return UserRead.model_validate(user)
 
     async def update_profile(self, user: User, data: UserProfileUpdate) -> UserRead:
-        updated = await self._repo.update(
-            user,
-            {
-                "first_name": data.first_name,
-                "last_name": data.last_name,
-                "email": data.email,
-                "is_profile_complete": True,
-            },
-        )
+        # Only update fields that were explicitly provided
+        updates: dict = {"is_profile_complete": True}
+        if data.first_name is not None:
+            updates["first_name"] = data.first_name
+        if data.last_name is not None:
+            updates["last_name"] = data.last_name
+        if data.email is not None:
+            updates["email"] = data.email
+        updated = await self._repo.update(user, updates)
         log.info("profile_updated", user_id=str(user.id))
         return UserRead.model_validate(updated)
 

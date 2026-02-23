@@ -15,6 +15,7 @@ from app.schemas.auth import (
     TokenResponse,
     VerifyOTPRequest,
 )
+from app.schemas.user import UserRead
 
 log = structlog.get_logger(__name__)
 
@@ -119,4 +120,5 @@ class AuthService:
             access_token=access_token,
             refresh_token=raw_refresh,
             is_new_user=is_new_user,
+            user=UserRead.model_validate(user),
         )

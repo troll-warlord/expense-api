@@ -15,7 +15,6 @@ class TransactionCreate(BaseModel):
     category_id: uuid.UUID
     payment_method_id: uuid.UUID
     description: str | None = Field(default=None, max_length=1000)
-    source: str | None = Field(default=None, max_length=50)
 
 
 class TransactionUpdate(BaseModel):
@@ -24,7 +23,6 @@ class TransactionUpdate(BaseModel):
     category_id: uuid.UUID | None = None
     payment_method_id: uuid.UUID | None = None
     description: str | None = Field(default=None, max_length=1000)
-    source: str | None = Field(default=None, max_length=50)
 
 
 class TransactionRead(BaseModel):

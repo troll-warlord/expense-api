@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.category import Category
@@ -40,7 +41,13 @@ class CategoryService:
     async def delete_category(self, category_id: UUID, user: User) -> None:
         category = await self._repo.get_user_category(category_id, user.id)
         self._ensure_exists_and_owned(category, user.id)
-        await self._repo.delete(category)
+        try:
+            await self._repo.delete(category)
+        except IntegrityError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete: this category has existing transactions",
+            )
 
     # ------------------------------------------------------------------
     def _ensure_exists_and_owned(self, category: Category | None, user_id: UUID) -> None:

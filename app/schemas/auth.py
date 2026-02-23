@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 
+from app.schemas.user import UserRead
+
 
 class RequestOTPRequest(BaseModel):
     country_code: str = Field(
@@ -48,6 +50,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     is_new_user: bool = False
     """True when the user was created for the first time during this verification."""
+    user: UserRead
 
 
 class RefreshTokenRequest(BaseModel):

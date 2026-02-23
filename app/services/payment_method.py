@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.payment_method import PaymentMethod
@@ -43,7 +44,13 @@ class PaymentMethodService:
     async def delete_payment_method(self, method_id: UUID, user: User) -> None:
         method = await self._repo.get_user_payment_method(method_id, user.id)
         self._ensure_exists_and_owned(method, user.id)
-        await self._repo.delete(method)
+        try:
+            await self._repo.delete(method)
+        except IntegrityError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete: this payment method has existing transactions",
+            )
 
     # ------------------------------------------------------------------
     def _ensure_exists_and_owned(self, method: PaymentMethod | None, user_id: UUID) -> None:
