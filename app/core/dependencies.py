@@ -57,3 +57,11 @@ async def get_current_user(
 
 # Typed alias for routes that require authentication
 CurrentUser = Annotated[object, Depends(get_current_user)]
+
+
+def get_client_source(request: Request) -> str:
+    """Return the server-normalised request origin (web / android / ios / api)."""
+    return getattr(request.state, "source", "api")
+
+
+ClientSource = Annotated[str, Depends(get_client_source)]

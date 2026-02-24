@@ -1,7 +1,9 @@
 name: Publish API Docs
 
 on:
-  workflow_dispatch: # allow manual trigger from the Actions tab
+  push:
+    branches: [main]
+  workflow_dispatch: {}
 
 # Allow only one concurrent deployment; cancel any in-progress run.
 concurrency:
@@ -9,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write   # needed to force-push the generated site to the live branch
+  contents: write
 
 jobs:
   build-and-deploy:

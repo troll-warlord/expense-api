@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.models.category import Category, CategoryType
+from app.models.payment_method import PaymentMethod
 from app.models.transaction import Transaction
 from app.repositories.base import BaseRepository
 
@@ -103,6 +104,47 @@ class TransactionRepository(BaseRepository[Transaction]):
             stmt = stmt.join(Category, Transaction.category_id == Category.id).where(Category.type == category_type)
         result = await self._session.execute(stmt)
         return result.scalar_one()
+
+    async def get_export_for_user(
+        self,
+        user_id: UUID,
+        *,
+        date_from: DateType | None = None,
+        date_to: DateType | None = None,
+        category_id: UUID | None = None,
+        payment_method_id: UUID | None = None,
+        category_type: CategoryType | None = None,
+        q: str | None = None,
+    ) -> list:
+        """Return all matching transactions with joined category/PM names for CSV export."""
+        filters = self._build_filters(
+            user_id,
+            date_from=date_from,
+            date_to=date_to,
+            category_id=category_id,
+            payment_method_id=payment_method_id,
+            q=q,
+        )
+        stmt = (
+            select(
+                Transaction.id,
+                Transaction.date,
+                Transaction.description,
+                Transaction.amount,
+                Transaction.source,
+                Category.name.label("category_name"),
+                Category.type.label("category_type"),
+                PaymentMethod.name.label("payment_method_name"),
+            )
+            .join(Category, Transaction.category_id == Category.id)
+            .join(PaymentMethod, Transaction.payment_method_id == PaymentMethod.id)
+            .where(*filters)
+            .order_by(Transaction.date.desc(), Transaction.created_at.desc())
+        )
+        if category_type is not None:
+            stmt = stmt.where(Category.type == category_type)
+        result = await self._session.execute(stmt)
+        return result.mappings().all()
 
     async def get_summary(
         self,

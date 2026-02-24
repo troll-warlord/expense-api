@@ -1,3 +1,5 @@
+import csv
+import io
 import math
 from datetime import date as DateType
 from decimal import Decimal
@@ -76,7 +78,7 @@ class TransactionService:
             )
         return TransactionReadDetail.model_validate(tx)
 
-    async def create_transaction(self, payload: TransactionCreate, user: User) -> TransactionRead:
+    async def create_transaction(self, payload: TransactionCreate, user: User, *, source: str = "api") -> TransactionRead:
         await self._validate_references(payload.category_id, payload.payment_method_id, user.id)
 
         transaction = Transaction(
@@ -85,6 +87,7 @@ class TransactionService:
             category_id=payload.category_id,
             payment_method_id=payload.payment_method_id,
             description=payload.description,
+            source=source,
             created_by=user.id,
             updated_by=user.id,
         )
@@ -128,6 +131,44 @@ class TransactionService:
         await self._repo.delete(tx)
         bind_contextvars(transaction_id=str(transaction_id))
 
+    async def export_csv(
+        self,
+        user: User,
+        *,
+        date_from: DateType | None = None,
+        date_to: DateType | None = None,
+        category_id=None,
+        payment_method_id=None,
+        category_type=None,
+        q: str | None = None,
+    ) -> tuple[str, int]:
+        """Return a UTF-8 CSV string of all matching transactions and the row count."""
+        rows = await self._repo.get_export_for_user(
+            user.id,
+            date_from=date_from,
+            date_to=date_to,
+            category_id=category_id,
+            payment_method_id=payment_method_id,
+            category_type=category_type,
+            q=q,
+        )
+        buf = io.StringIO()
+        buf.write("\ufeff")  # BOM — ensures Excel opens with correct encoding
+        writer = csv.writer(buf)
+        writer.writerow(["Date", "Description", "Category", "Type", "Payment Method", "Amount", "Source"])
+        for row in rows:
+            cat_type = row["category_type"]
+            writer.writerow([
+                str(row["date"]),
+                row["description"] or "",
+                row["category_name"],
+                str(cat_type.value) if hasattr(cat_type, "value") else str(cat_type),
+                row["payment_method_name"],
+                str(row["amount"]),
+                row["source"] or "",
+            ])
+        return buf.getvalue(), len(rows)
+
     # ------------------------------------------------------------------
     async def get_summary(
         self,
@@ -138,19 +179,19 @@ class TransactionService:
     ) -> TransactionSummary:
         rows = await self._repo.get_summary(user.id, date_from=date_from, date_to=date_to)
 
-        by_category = [
+        category_breakdown = [
             CategorySummary(
                 category_id=row["category_id"],
-                category_name=row["category_name"],
-                category_type=str(row["category_type"].value),
+                name=row["category_name"],
+                type=str(row["category_type"].value),
                 total=Decimal(str(row["total"])),
                 count=row["count"],
             )
             for row in rows
         ]
 
-        total_income = sum((c.total for c in by_category if c.category_type == "income"), Decimal(0))
-        total_expense = sum((c.total for c in by_category if c.category_type == "expense"), Decimal(0))
+        total_income = sum((c.total for c in category_breakdown if c.type == "income"), Decimal(0))
+        total_expense = sum((c.total for c in category_breakdown if c.type == "expense"), Decimal(0))
 
         return TransactionSummary(
             date_from=date_from,
@@ -158,7 +199,8 @@ class TransactionService:
             total_income=total_income,
             total_expense=total_expense,
             net=total_income - total_expense,
-            by_category=by_category,
+            transaction_count=sum(c.count for c in category_breakdown),
+            category_breakdown=category_breakdown,
         )
 
     async def _validate_references(self, category_id: UUID, payment_method_id: UUID, user_id: UUID) -> None:

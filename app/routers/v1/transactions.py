@@ -1,9 +1,11 @@
 from datetime import date as DateType
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import StreamingResponse
 
-from app.core.dependencies import CurrentUser, DBSession
+from app.core.dependencies import ClientSource, CurrentUser, DBSession
 from app.models.category import CategoryType
 from app.schemas.common import PaginatedResponse, ResponseWrapper
 from app.schemas.transaction import (
@@ -68,6 +70,39 @@ async def get_summary(
     return ResponseWrapper.ok(data=data)
 
 
+@router.get(
+    "/export",
+    summary="Export transactions as CSV",
+    description="Streams a CSV file of all transactions matching the given filters. No row limit.",
+    status_code=status.HTTP_200_OK,
+)
+async def export_transactions(
+    current_user: CurrentUser,
+    service: TransactionService = TransactionServiceDep,
+    date_from: DateType | None = Query(default=None),
+    date_to: DateType | None = Query(default=None),
+    category_id: UUID | None = Query(default=None),
+    payment_method_id: UUID | None = Query(default=None),
+    type: CategoryType | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=200),
+):
+    csv_content, _ = await service.export_csv(
+        current_user,
+        date_from=date_from,
+        date_to=date_to,
+        category_id=category_id,
+        payment_method_id=payment_method_id,
+        category_type=type,
+        q=q,
+    )
+    filename = f"transactions-{datetime.today().strftime('%Y-%m-%d')}.csv"
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/{transaction_id}", response_model=ResponseWrapper[TransactionReadDetail], status_code=status.HTTP_200_OK)
 async def get_transaction(transaction_id: UUID, current_user: CurrentUser, service: TransactionService = TransactionServiceDep):
     data = await service.get_transaction(transaction_id, current_user)
@@ -75,8 +110,8 @@ async def get_transaction(transaction_id: UUID, current_user: CurrentUser, servi
 
 
 @router.post("", response_model=ResponseWrapper[TransactionRead], status_code=status.HTTP_201_CREATED)
-async def create_transaction(payload: TransactionCreate, current_user: CurrentUser, service: TransactionService = TransactionServiceDep):
-    data = await service.create_transaction(payload, current_user)
+async def create_transaction(payload: TransactionCreate, current_user: CurrentUser, source: ClientSource, service: TransactionService = TransactionServiceDep):
+    data = await service.create_transaction(payload, current_user, source=source)
     return ResponseWrapper.ok(data=data, message="Transaction created")
 
 

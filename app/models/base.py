@@ -36,7 +36,7 @@ class AuditMixin:
         String(50),
         nullable=True,
         default=None,
-        comment="Record origin: web, mobile, api, etc.",
+        comment="Request origin: web, android, ios, api.",
         sort_order=999,
     )
     created_by: Mapped[uuid.UUID | None] = mapped_column(

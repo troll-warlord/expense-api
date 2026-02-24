@@ -1,6 +1,10 @@
 import structlog
+from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.category import Category
+from app.models.payment_method import PaymentMethod
+from app.models.transaction import Transaction
 from app.models.user import User
 from app.repositories.user import UserRepository
 from app.schemas.user import UserProfileUpdate, UserRead
@@ -10,6 +14,7 @@ log = structlog.get_logger(__name__)
 
 class UserService:
     def __init__(self, session: AsyncSession) -> None:
+        self._session = session
         self._repo = UserRepository(session)
 
     async def get_me(self, user: User) -> UserRead:
@@ -28,7 +33,17 @@ class UserService:
         log.info("Profile updated", user_id=str(user.id))
         return UserRead.model_validate(updated)
 
-    async def deactivate(self, user: User) -> UserRead:
-        updated = await self._repo.update(user, {"is_active": False})
-        log.warning("Account deactivated", user_id=str(user.id))
-        return UserRead.model_validate(updated)
+    async def delete_account(self, user: User) -> None:
+        """Permanently delete the account and all user-owned data."""
+        uid = user.id
+        # Delete in dependency order to avoid FK violations.
+        # refresh_tokens cascade automatically via DB FK ON DELETE CASCADE.
+        await self._session.execute(sql_delete(Transaction).where(Transaction.created_by == uid))
+        await self._session.execute(
+            sql_delete(Category).where(Category.created_by == uid, Category.is_default.is_(False))
+        )
+        await self._session.execute(
+            sql_delete(PaymentMethod).where(PaymentMethod.created_by == uid, PaymentMethod.is_default.is_(False))
+        )
+        await self._repo.delete(user)
+        log.warning("Account permanently deleted", user_id=str(uid))

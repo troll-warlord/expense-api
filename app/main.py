@@ -61,6 +61,13 @@ def create_app() -> FastAPI:
         request_id = str(uuid.uuid4())
         request.state.request_id = request_id
 
+        # Resolve client source from header; default to "api" for unknown callers
+        _VALID_SOURCES = {"web", "android", "ios", "api"}
+        client_source = request.headers.get("X-Client-Source", "api").lower().strip()
+        if client_source not in _VALID_SOURCES:
+            client_source = "api"
+        request.state.source = client_source
+
         # Soft-decode user ID from Bearer token — never raises
         user_id: str | None = None
         auth_header = request.headers.get("Authorization", "")
@@ -83,6 +90,7 @@ def create_app() -> FastAPI:
             request_id=request_id,
             user_id=user_id,
             ip=client_ip,
+            source=client_source,
         )
 
         start = time.perf_counter()

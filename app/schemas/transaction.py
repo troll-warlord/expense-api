@@ -50,8 +50,8 @@ class TransactionReadDetail(TransactionRead):
 
 class CategorySummary(BaseModel):
     category_id: uuid.UUID
-    category_name: str
-    category_type: str  # "income" | "expense"
+    name: str
+    type: str  # "income" | "expense"
     total: Decimal
     count: int
 
@@ -64,4 +64,5 @@ class TransactionSummary(BaseModel):
     total_income: Decimal
     total_expense: Decimal
     net: Decimal  # total_income - total_expense
-    by_category: list[CategorySummary]
+    transaction_count: int
+    category_breakdown: list[CategorySummary]

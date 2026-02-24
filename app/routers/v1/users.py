@@ -33,7 +33,13 @@ async def update_profile(payload: UserProfileUpdate, current_user: CurrentUser, 
     return ResponseWrapper.ok(data=data, message="Profile updated")
 
 
-@router.delete("/me", response_model=ResponseWrapper[None], status_code=status.HTTP_200_OK)
-async def deactivate_account(current_user: CurrentUser, service: UserService = UserServiceDep):
-    await service.deactivate(current_user)
-    return ResponseWrapper.ok(message="Account deactivated")
+@router.delete(
+    "/me",
+    response_model=ResponseWrapper[None],
+    status_code=status.HTTP_200_OK,
+    summary="Delete account",
+    description="Permanently deletes the account and all associated data. Irreversible.",
+)
+async def delete_account(current_user: CurrentUser, service: UserService = UserServiceDep):
+    await service.delete_account(current_user)
+    return ResponseWrapper.ok(message="Account permanently deleted")
