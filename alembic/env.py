@@ -22,6 +22,7 @@ if config.config_file_name is not None:
 # Import all models so Alembic can detect schema changes.
 # Every model module must be listed here so its tables register on Base.metadata
 # before autogenerate inspects it.  Add new model modules here as they are created.
+import app.models.budget  # noqa: F401, E402
 import app.models.category  # noqa: F401, E402
 import app.models.payment_method  # noqa: F401, E402
 import app.models.refresh_token  # noqa: F401, E402

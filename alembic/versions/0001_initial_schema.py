@@ -150,8 +150,38 @@ def upgrade() -> None:
     op.execute("CREATE UNIQUE INDEX uq_categories_user_name_type ON categories (created_by, name, type) WHERE created_by IS NOT NULL")
     op.execute("CREATE UNIQUE INDEX uq_payment_methods_user_name ON payment_methods (created_by, name) WHERE created_by IS NOT NULL")
 
+    # ── budgets ───────────────────────────────────────────────────────
+    op.create_table(
+        "budgets",
+        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False, server_default=sa.text("gen_random_uuid()")),
+        sa.Column("category_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("amount", sa.Numeric(precision=12, scale=2), nullable=False),
+        sa.Column("period", sa.String(20), nullable=False, server_default="monthly"),
+        sa.Column("source", sa.String(50), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column("created_by", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("updated_by", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.CheckConstraint("amount > 0", name="ck_budgets_amount_positive"),
+        sa.ForeignKeyConstraint(["category_id"], ["categories.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="SET NULL"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index("ix_budgets_id", "budgets", ["id"])
+    op.create_index("ix_budgets_category_id", "budgets", ["category_id"])
+    op.create_index("ix_budgets_created_by", "budgets", ["created_by"])
+    # Partial unique indexes properly handle NULL category_id (overall budget):
+    #   one overall budget per user per period, one per (user, category, period)
+    op.execute("CREATE UNIQUE INDEX uq_budgets_user_overall ON budgets (created_by, period) WHERE category_id IS NULL")
+    op.execute("CREATE UNIQUE INDEX uq_budgets_user_category ON budgets (created_by, category_id, period) WHERE category_id IS NOT NULL")
+
 
 def downgrade() -> None:
+    op.drop_index("ix_budgets_created_by", table_name="budgets")
+    op.drop_index("ix_budgets_category_id", table_name="budgets")
+    op.drop_index("ix_budgets_id", table_name="budgets")
+    op.drop_table("budgets")
     op.drop_table("transactions")
     op.drop_table("refresh_tokens")
     op.drop_table("payment_methods")
