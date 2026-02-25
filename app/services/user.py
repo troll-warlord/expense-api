@@ -22,13 +22,18 @@ class UserService:
 
     async def update_profile(self, user: User, data: UserProfileUpdate) -> UserRead:
         # Only update fields that were explicitly provided
-        updates: dict = {"is_profile_complete": True}
+        updates: dict = {}
         if data.first_name is not None:
             updates["first_name"] = data.first_name
         if data.last_name is not None:
             updates["last_name"] = data.last_name
-        if data.email is not None:
-            updates["email"] = data.email
+        if data.phone_number is not None:
+            updates["phone_number"] = data.phone_number
+        # Mark profile complete once first_name and last_name are both set
+        first = updates.get("first_name", user.first_name)
+        last = updates.get("last_name", user.last_name)
+        if first and last:
+            updates["is_profile_complete"] = True
         updated = await self._repo.update(user, updates)
         log.info("Profile updated", user_id=str(user.id))
         return UserRead.model_validate(updated)

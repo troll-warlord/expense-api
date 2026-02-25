@@ -26,36 +26,34 @@ class AuthService:
         self._user_repo = UserRepository(session)
         self._token_repo = RefreshTokenRepository(session)
 
-    async def request_otp(self, country_code: str, phone_number: str) -> RequestOTPResponse:
-        """Generate and 'send' (print) an OTP for the given phone number."""
-        generate_otp()  # mock — prints OTP to stdout; real impl would send SMS
-        log.info("OTP requested", country_code=country_code, phone_number=phone_number)
+    async def request_otp(self, email: str) -> RequestOTPResponse:
+        """Generate and 'send' (print) an OTP for the given email address."""
+        generate_otp()  # mock — prints OTP to stdout; real impl would send email
+        log.info("OTP requested", email=email)
         return RequestOTPResponse(
-            country_code=country_code,
-            phone_number=phone_number,
+            email=email,
             message="OTP sent successfully",
         )
 
     async def verify_otp_and_login(self, payload: VerifyOTPRequest) -> TokenResponse:
-        """Validate OTP, upsert user, issue access + refresh tokens."""
+        """Validate OTP, upsert user by email, issue access + refresh tokens."""
         if not verify_otp(payload.otp):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid or expired OTP",
             )
 
-        # Upsert user
-        user = await self._user_repo.get_by_phone(payload.country_code, payload.phone_number)
+        email = payload.email.lower()
+        user = await self._user_repo.get_by_email(email)
         is_new_user = user is None
         if is_new_user:
             user = User(
-                country_code=payload.country_code,
-                phone_number=payload.phone_number,
+                email=email,
                 is_active=True,
                 is_profile_complete=False,
             )
             await self._user_repo.create(user)
-            log.info("New user registered", country_code=payload.country_code, phone_number=payload.phone_number)
+            log.info("New user registered", email=email)
         elif not user.is_active:
             log.warning("Login blocked — account is deactivated", user_id=str(user.id))
             raise HTTPException(

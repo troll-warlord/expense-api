@@ -5,7 +5,6 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 from structlog.contextvars import bind_contextvars
 
 from app.models.budget import Budget

@@ -26,7 +26,7 @@ AuthServiceDep = Depends(_auth_service)
 @router.post("/request-otp", response_model=ResponseWrapper[RequestOTPResponse], status_code=status.HTTP_200_OK)
 @limiter.limit("5/minute")
 async def request_otp(request: Request, payload: RequestOTPRequest, service: AuthService = AuthServiceDep):
-    data = await service.request_otp(payload.country_code, payload.phone_number)
+    data = await service.request_otp(payload.email)
     return ResponseWrapper.ok(data=data, message="OTP sent successfully")
 
 

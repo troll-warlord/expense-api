@@ -8,9 +8,9 @@ Fully deterministic: uses a fixed random seed and a fixed reference date
 Safe to re-run: skips users and transactions that already exist (idempotent).
 
 Demo logins (all use OTP 000000):
-  +91 1111111111  — Arjun Sharma   (salary 65 000)
-  +91 2222222222  — Priya Patel    (salary 85 000)
-  +91 3333333333  — Ravi Kumar     (salary 55 000)
+  arjun@demo.com  — Arjun Sharma   (salary 65 000)
+  priya@demo.com  — Priya Patel    (salary 85 000)
+  ravi@demo.com   — Ravi Kumar     (salary 55 000)
 
 Revision ID: 0003
 Revises: 0002
@@ -39,11 +39,11 @@ depends_on: str | Sequence[str] | None = None
 # ---------------------------------------------------------------------------
 REFERENCE_DATE = date(2026, 2, 23)
 
-# (user_id, country_code, phone, first_name, last_name, monthly_salary, rng_seed)
+# (user_id, email, phone_number, first_name, last_name, monthly_salary, rng_seed)
 DEMO_USERS = [
-    ("c1000001-0000-0000-0000-000000000001", "+91", "1111111111", "Arjun", "Sharma", 65000, 1001),
-    ("c1000001-0000-0000-0000-000000000002", "+91", "2222222222", "Priya", "Patel", 85000, 1002),
-    ("c1000001-0000-0000-0000-000000000003", "+91", "3333333333", "Ravi", "Kumar", 55000, 1003),
+    ("c1000001-0000-0000-0000-000000000001", "arjun@demo.com", "1111111111", "Arjun", "Sharma", 65000, 1001),
+    ("c1000001-0000-0000-0000-000000000002", "priya@demo.com", "2222222222", "Priya", "Patel",  85000, 1002),
+    ("c1000001-0000-0000-0000-000000000003", "ravi@demo.com",  "3333333333", "Ravi",  "Kumar",  55000, 1003),
 ]
 
 # ---------------------------------------------------------------------------
@@ -232,27 +232,25 @@ def _build_transactions(user_id: str, salary: int, seed: int) -> list[dict]:
 def upgrade() -> None:
     bind = op.get_bind()
 
-    for user_id, country_code, phone, first_name, last_name, salary, seed in DEMO_USERS:
-        # Insert user only if the phone number is not already registered
+    for user_id, email, phone, first_name, last_name, salary, seed in DEMO_USERS:
+        # Insert user only if the email is not already registered
         bind.execute(
             sa.text(
                 "INSERT INTO users"
-                " (id, country_code, phone_number, first_name, last_name,"
+                " (id, email, phone_number, first_name, last_name,"
                 "  is_profile_complete, is_active, created_at, updated_at)"
-                " SELECT :id, :cc, :phone, :first, :last, true, true, now(), now()"
+                " SELECT :id, :email, :phone, :first, :last, true, true, now(), now()"
                 " WHERE NOT EXISTS ("
-                "   SELECT 1 FROM users"
-                "   WHERE country_code = :cc_chk AND phone_number = :phone_chk"
+                "   SELECT 1 FROM users WHERE email = :email_chk"
                 " )"
             ),
             {
                 "id": user_id,
-                "cc": country_code,
+                "email": email,
                 "phone": phone,
                 "first": first_name,
                 "last": last_name,
-                "cc_chk": country_code,
-                "phone_chk": phone,
+                "email_chk": email,
             },
         )
 

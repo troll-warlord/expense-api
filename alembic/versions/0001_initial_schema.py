@@ -42,12 +42,12 @@ def upgrade() -> None:
     op.create_table(
         "users",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("country_code", sa.String(10), nullable=False, comment="E.164 country code, e.g. +91, +1"),
-        sa.Column("phone_number", sa.String(15), nullable=False, comment="Local phone number without country code"),
+        sa.Column("email", sa.String(255), nullable=False, comment="Login identifier — unique, required"),
+        sa.Column("country_code", sa.String(10), nullable=True, comment="E.164 country code, e.g. +91, +1 (optional contact)"),
+        sa.Column("phone_number", sa.String(15), nullable=True, comment="Local phone number without country code (optional contact)"),
         sa.Column("first_name", sa.String(100), nullable=True),
         sa.Column("last_name", sa.String(100), nullable=True),
-        sa.Column("email", sa.String(255), nullable=True),
-        sa.Column("is_profile_complete", sa.Boolean(), nullable=False, server_default=sa.text("false"), comment="True once user has submitted first_name, last_name, email"),
+        sa.Column("is_profile_complete", sa.Boolean(), nullable=False, server_default=sa.text("false"), comment="True once user has submitted first_name and last_name"),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("source", sa.String(50), nullable=True, comment="Record origin: web, mobile, api, etc."),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -57,11 +57,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("country_code", "phone_number", name="uq_users_country_phone"),
     )
     op.create_index(op.f("ix_users_id"), "users", ["id"], unique=False)
-    op.create_index(op.f("ix_users_phone_number"), "users", ["phone_number"], unique=False)
     op.create_index(op.f("ix_users_email"), "users", ["email"], unique=True)
+    # Partial unique index: two accounts cannot share a phone number, but NULL is allowed
+    op.execute("CREATE UNIQUE INDEX uq_users_phone_number ON users (phone_number) WHERE phone_number IS NOT NULL")
 
     # ── categories ────────────────────────────────────────────────────
     op.create_table(

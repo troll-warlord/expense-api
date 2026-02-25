@@ -1,41 +1,23 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.user import UserRead
 
 
 class RequestOTPRequest(BaseModel):
-    country_code: str = Field(
-        default="+91",
-        min_length=2,
-        max_length=10,
-        pattern=r"^\+\d{1,3}$",
-        examples=["+91"],
-        description="E.164 country code, e.g. +91, +1",
-    )
-    phone_number: str = Field(
+    email: EmailStr = Field(
         ...,
-        min_length=6,
-        max_length=15,
-        pattern=r"^\d{6,15}$",
-        examples=["9876543210"],
-        description="Local phone number without country code, digits only",
+        examples=["user@example.com"],
+        description="Email address to send the OTP to",
     )
 
 
 class RequestOTPResponse(BaseModel):
-    country_code: str
-    phone_number: str
+    email: str
     message: str = "OTP sent successfully"
 
 
 class VerifyOTPRequest(BaseModel):
-    country_code: str = Field(
-        default="+91",
-        min_length=2,
-        max_length=10,
-        pattern=r"^\+\d{1,3}$",
-    )
-    phone_number: str = Field(..., min_length=6, max_length=15, pattern=r"^\d{6,15}$")
+    email: EmailStr = Field(..., description="Email address used to request the OTP")
     otp: str = Field(..., min_length=6, max_length=6)
     device_hint: str | None = Field(
         default=None,
